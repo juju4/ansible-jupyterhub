@@ -68,6 +68,7 @@ jobs:
       - name: After script - files
         run: |
           set -x
+          ls -l /etc/rancher/k3s/
           cat /etc/rancher/k3s/config.yaml
           cat /opt/jupyterhub/config.yaml
         if: ${{ always() }}
@@ -90,5 +91,6 @@ jobs:
           export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
           kubectl get pods --all-namespaces
           helm ls --all-namespaces
+          kubectl --namespace default get service proxy-public
         if: ${{ always() }}
         continue-on-error: true
