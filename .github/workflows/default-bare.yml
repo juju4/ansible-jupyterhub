@@ -70,7 +70,7 @@ jobs:
           set -x
           ls -l /etc/rancher/k3s/
           cat /etc/rancher/k3s/config.yaml
-          cat /opt/jupyterhub/config.yaml
+          sudo cat /opt/jupyterhub/config.yaml
         if: ${{ always() }}
         continue-on-error: true
       - name: After script - network
