@@ -76,6 +76,7 @@ jobs:
       - name: After script - network
         run: |
           set -x
+          ip address
           sudo ss -tunap | grep LISTEN
         if: ${{ always() }}
         continue-on-error: true
@@ -89,8 +90,14 @@ jobs:
         run: |
           set -x
           export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-          kubectl get pods --all-namespaces
+          kubectl get pods --all-namespaces -o wide
           helm ls --all-namespaces
           kubectl --namespace default get service proxy-public
+        if: ${{ always() }}
+        continue-on-error: true
+      - name: After script - curl
+        run: |
+          set -x
+          curl -v http://localhost
         if: ${{ always() }}
         continue-on-error: true
