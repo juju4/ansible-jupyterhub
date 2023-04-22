@@ -99,6 +99,6 @@ jobs:
         run: |
           set -x
           curl -v http://localhost || true
-          curl -v http://$(hostname -I)/hub/tmplogin || true
+          curl -v http://$(kubectl --namespace default get service proxy-public --output jsonpath='{.status.loadBalancer.ingress[].ip}')/hub/tmplogin || true
         if: ${{ always() }}
         continue-on-error: true
