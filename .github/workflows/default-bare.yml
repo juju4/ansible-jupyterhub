@@ -92,12 +92,13 @@ jobs:
           export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
           kubectl get pods --all-namespaces -o wide
           helm ls --all-namespaces
-          kubectl --namespace default get service proxy-public
+          kubectl get services
         if: ${{ always() }}
         continue-on-error: true
       - name: After script - curl
         run: |
           set -x
-          curl -v http://localhost
+          curl -v http://localhost || true
+          curl -v http://$(hostname -I)/hub/tmplogin || true
         if: ${{ always() }}
         continue-on-error: true
