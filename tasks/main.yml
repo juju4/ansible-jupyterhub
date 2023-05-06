@@ -26,6 +26,7 @@
   ansible.builtin.command:
     cmd: which k3s
   register: k3s_found
+  changed_when: false
   ignore_errors: true
 
 - name: K3s present
@@ -34,6 +35,8 @@
     - name: SET_FACT; set jh_k3s_kubeconfig if k3s is found on host
       ansible.builtin.set_fact:
         jh_k3s_kubeconfig: "KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
+        k3s_environment:
+          KUBECONFIG: "{% if k3s_found is success %}/etc/rancher/k3s/k3s.yaml{% else %}{% endif %}"
 
     - name: FILE; create HOME .kube directory if necessary
       ansible.builtin.file:
@@ -73,6 +76,7 @@
   ansible.builtin.command:
     cmd: which helm
   register: helm_found
+  changed_when: false
   ignore_errors: true
 
 - name: SHELL; install helm, if not found
@@ -80,15 +84,34 @@
     cmd: |
       set -o pipefail
       curl https://raw.githubusercontent.com/helm/helm/HEAD/scripts/get-helm-3 | bash
+  args:
+    executable: /bin/bash
   when: helm_found is failed
 
 - name: SHELL; Add jupyterhub chart repo
-  ansible.builtin.shell:
-    cmd: helm repo add jupyterhub https://jupyterhub.github.io/helm-chart/ ; helm repo update
+  kubernetes.core.helm_repository:
+    name: jupyterhub
+    repo_url: https://jupyterhub.github.io/helm-chart/
+  # ansible.builtin.command:
+  #   cmd: helm repo add jupyterhub https://jupyterhub.github.io/helm-chart/
+  environment: "{{ proxy_env | default(omit) }}"
+  register: helm1
+  # changed_when: "'already exists with the same configuration, skipping' not in helm1.stdout"
+  # notify:
+  #   - Update helm repo
 
 - name: SHELL; install/Upgrade helm chart
-  ansible.builtin.command:
-    cmd: "helm upgrade --cleanup-on-fail --install jupyterhub jupyterhub/jupyterhub --version={{ JH_CHART_VERSION }} --namespace {{ JH_NAMESPACE }} --create-namespace --values {{ JH_CONFIG_DIR }}/config.yaml --timeout 20m"
-  environment:
-    KUBECONFIG: "{% if k3s_found is success %}/etc/rancher/k3s/k3s.yaml{% else %}{% endif %}"
-  async: 1200
+  # ansible.builtin.command:
+  #   cmd: "helm upgrade --cleanup-on-fail --install jupyterhub jupyterhub/jupyterhub --version={{ JH_CHART_VERSION }} --namespace {{ JH_NAMESPACE }} --create-namespace --values {{ JH_CONFIG_DIR }}/config.yaml --timeout 20m"
+  kubernetes.core.helm:
+    name: jupyterhub
+    chart_ref: jupyterhub/jupyterhub
+    release_namespace: "{{ JH_NAMESPACE }}"
+    create_namespace: true
+    update_repo_cache: true
+    values_files:
+      - "{{ JH_CONFIG_DIR }}/config.yaml"
+    timeout: 20m
+  environment: "{{ k3s_environment | ansible.builtin.combine(proxy_env | default({})) }}"
+  # async: 1200
+  # poll: 15

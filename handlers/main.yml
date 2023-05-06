@@ -1,3 +1,4 @@
+---
 # because we use ansible-pull and include_role (dynamic includes), handlers do not work
 
 # - name: restart apache2
@@ -9,3 +10,8 @@
 #   systemd:
 #     name: jupyterhub
 #     state: restarted
+
+- name: Update helm repo
+  ansible.builtin.command:
+    cmd: helm repo update
+  environment: "{{ proxy_env | default(omit) }}"
