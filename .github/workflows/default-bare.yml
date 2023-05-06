@@ -62,9 +62,31 @@ jobs:
           cd $GITHUB_WORKSPACE/$ANSIBLE_ROLE && ansible-playbook --connection=local --become -vvv molecule/default/converge.yml | tee /tmp/idempotency.log | grep -q 'changed=0.*failed=0'  && (echo 'Idempotence test: pass' && exit 0)  || (echo 'Idempotence test: fail' && cat /tmp/idempotency.log && exit 0)
       - name: On failure
         run: |
-          cd $GITHUB_WORKSPACE/$ANSIBLE_ROLE
-          ansible --connection=local -m setup localhost
-        if: env.WORKFLOW_CONCLUSION == 'failure'  # notify only if failure
+          systemctl -l --no-pager status
+          systemctl -l --no-pager --failed
+          ls -l /usr/bin/ | egrep '(python|pip|ansible)'
+          pip freeze
+          pip3 freeze
+          ip addr
+          cat /etc/resolv.conf
+          host www.google.com
+          ping -c 1 www.google.com || true
+          ping -c 1 8.8.8.8 || true
+        if: ${{ failure() }}
+        continue-on-error: true
+      - name: After script - ansible setup
+        run: |
+          ansible -i inventory --connection=local -m setup localhost
+        if: ${{ always() }}
+        continue-on-error: true
+      - name: After script - systemd
+        run: |
+          systemctl -l --no-pager status docker || true
+          systemctl -l --no-pager status k3s || true
+          systemctl -l --no-pager status kubelet || true
+          systemd-analyze --no-pager security || true
+        if: ${{ always() }}
+        continue-on-error: true
       - name: After script - files
         run: |
           set -x
@@ -90,9 +112,21 @@ jobs:
         run: |
           set -x
           export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          kubectl get nodes
           kubectl get pods --all-namespaces -o wide
-          helm ls --all-namespaces
           kubectl get services
+          kubectl get apiservices
+          k3s check-config || true
+          kubectl config view || true
+          sudo ctr image pull docker.io/rancher/mirrored-pause:latest || true
+        if: ${{ always() }}
+        continue-on-error: true
+      - name: After script - helm
+        run: |
+          set -x
+          helm ls --all-namespaces
+          helm status jupyterhub || true
+          helm history jupyterhub || true
         if: ${{ always() }}
         continue-on-error: true
       - name: After script - curl
@@ -100,5 +134,11 @@ jobs:
           set -x
           curl -v http://localhost || true
           curl -v http://$(kubectl --namespace default get service proxy-public --output jsonpath='{.status.loadBalancer.ingress[].ip}')/hub/tmplogin || true
+        if: ${{ always() }}
+        continue-on-error: true
+      - name: After script - journalctl
+        run: |
+          set -x
+          journalctl -xeu k3s -l --no-pager
         if: ${{ always() }}
         continue-on-error: true
